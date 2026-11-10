@@ -32,6 +32,7 @@
 #include "mt-kahypar/parallel/parallel_prefix_sum.h"
 #include "mt-kahypar/datastructures/concurrent_bucket_map.h"
 #include "mt-kahypar/datastructures/hypergraph_utils.h"
+#include "mt-kahypar/datastructures/metadata/edge_metadata_contraction_policy.h"
 #include "mt-kahypar/utils/timer.h"
 #include "mt-kahypar/utils/memory_tree.h"
 
@@ -39,7 +40,6 @@
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_sort.h>
-
 
 namespace mt_kahypar::ds {
   /*!
@@ -51,7 +51,22 @@ namespace mt_kahypar::ds {
    *
    * \param communities Community structure that should be contracted
    */
-  StaticGraph StaticGraph::contract(parallel::scalable_vector<HypernodeID>& communities, bool /*deterministic*/) {
+  StaticGraph StaticGraph::contract(
+    parallel::scalable_vector<HypernodeID>& communities,
+    bool deterministic) {
+    switch (_edge_metadata.type) {
+      case EdgeMetadataStorage::Type::NONE:
+        return contractImpl(communities, deterministic, NoEdgeMetadataContractionPolicy{});
+
+      case EdgeMetadataStorage::Type::NATURAL_EDGE:
+        return contractImpl(communities, deterministic, NaturalEdgeMetadataContractionPolicy{});
+    }
+
+    throw UnsupportedOperationException("Unsupported edge metadata type");
+  }
+
+  template<class EdgeMetadataContractionPolicy>
+  StaticGraph StaticGraph::contractImpl(parallel::scalable_vector<HypernodeID>& communities, bool /*deterministic*/, const EdgeMetadataContractionPolicy& edge_metadata_propagation_policy) {
     ASSERT(communities.size() == _num_nodes);
 
     if ( !_tmp_contraction_buffer ) {
@@ -157,9 +172,16 @@ namespace mt_kahypar::ds {
         const Edge& edge = _edges[edges_pos + i];
         const HyperedgeID unique_id = _unique_edge_ids[edges_pos + i];
         const HypernodeID target = map_to_coarse_graph(edge.target());
+
+        EdgeMetadataStorage::Value metadata{};
+        if constexpr (EdgeMetadataContractionPolicy::enabled) {
+          metadata = _edge_metadata.values[edges_pos + i];
+        }
+
         const bool is_valid = target != coarse_node;
+
         if (is_valid) {
-          tmp_edges[coarse_edges_pos + i] = TmpEdgeInformation(target, edge.weight(), unique_id);
+          tmp_edges[coarse_edges_pos + i] = TmpEdgeInformation(target, edge.weight(), unique_id, metadata);
         } else {
           tmp_edges[coarse_edges_pos + i] = TmpEdgeInformation();
         }
@@ -184,7 +206,8 @@ namespace mt_kahypar::ds {
       if (tmp_degree <= HIGH_DEGREE_CONTRACTION_THRESHOLD) {
         // if the degree is small enough, we directly deduplicate the edges
         node_sizes[coarse_node] = deduplicateTmpEdges(tmp_edges.data() + incident_edges_start,
-                                                      tmp_edges.data() + incident_edges_end);
+                                                      tmp_edges.data() + incident_edges_end,
+                                                      edge_metadata_propagation_policy);
       } else {
         std::lock_guard<std::mutex> lock(high_degree_vertex_mutex);
         high_degree_vertices.push_back(coarse_node);
@@ -223,7 +246,7 @@ namespace mt_kahypar::ds {
           // there can be thousands of edges with the same target, which creates a massive imbalance and thus high
           // contention in the bucket map if we insert them directly. The local deduplication avoids this problem
           // by ensuring that each edge appears at most t times.
-          const HyperedgeID local_degree = deduplicateTmpEdges(tmp_edges.data() + start, tmp_edges.data() + end);
+          const HyperedgeID local_degree = deduplicateTmpEdges(tmp_edges.data() + start, tmp_edges.data() + end, edge_metadata_propagation_policy);
           for (size_t pos = start; pos < start + local_degree; ++pos) {
             const TmpEdgeInformation& edge = tmp_edges[pos];
             ASSERT(edge.isValid());
@@ -235,8 +258,10 @@ namespace mt_kahypar::ds {
         std::atomic<size_t> incident_edges_pos(incident_edges_start);
         tbb::parallel_for(UL(0), incident_edges_map.numBuckets(), [&](const size_t bucket) {
           auto& incident_edges_bucket = incident_edges_map.getBucket(bucket);
-          const HyperedgeID bucket_degree = deduplicateTmpEdges(incident_edges_bucket.data(),
-                                              incident_edges_bucket.data() + incident_edges_bucket.size());
+          const HyperedgeID bucket_degree = deduplicateTmpEdges(
+                                              incident_edges_bucket.data(),
+                                              incident_edges_bucket.data() + incident_edges_bucket.size(),
+                                              edge_metadata_propagation_policy);
           const size_t tmp_incident_edges_pos = incident_edges_pos.fetch_add(bucket_degree);
           memcpy(tmp_edges.data() + tmp_incident_edges_pos,
                  incident_edges_bucket.data(), sizeof(TmpEdgeInformation) * bucket_degree);
@@ -280,6 +305,7 @@ namespace mt_kahypar::ds {
     const HyperedgeID coarsened_num_edges = degree_mapping.total_sum();
     hypergraph._num_nodes = coarsened_num_nodes;
     hypergraph._num_edges = coarsened_num_edges;
+    hypergraph._edge_metadata.type = _edge_metadata.type;
 
     HEAVY_COARSENING_ASSERT(
       [&]{
@@ -300,6 +326,11 @@ namespace mt_kahypar::ds {
       edge_id_mapping.assign(_num_edges / 2, 0);
       hypergraph._edges.resizeNoAssign(coarsened_num_edges);
       hypergraph._unique_edge_ids.resizeNoAssign(coarsened_num_edges);
+
+      if constexpr ( EdgeMetadataContractionPolicy::enabled ) {
+        hypergraph._edge_metadata.values.resizeNoAssign(coarsened_num_edges);
+      }
+
       tbb::parallel_for(ID(0), coarsened_num_nodes, [&](const HyperedgeID& coarse_node) {
         const HyperedgeID tmp_edges_start = tmp_nodes[coarse_node].firstEntry();
         const HyperedgeID edges_start = degree_mapping[coarse_node];
@@ -311,6 +342,9 @@ namespace mt_kahypar::ds {
           edge.setSource(coarse_node);
           edge.setWeight(tmp_edge.getWeight());
           hypergraph._unique_edge_ids[edges_start + index] = tmp_edge.getID();
+          if constexpr ( EdgeMetadataContractionPolicy::enabled ) {
+            hypergraph._edge_metadata.values[edges_start + index] = tmp_edge.getMetadata();
+          }
           ASSERT(static_cast<size_t>(tmp_edge.getID()) < edge_id_mapping.size());
           edge_id_mapping[tmp_edge.getID()] = UL(1);
         };
@@ -398,8 +432,8 @@ namespace mt_kahypar::ds {
     return hypergraph;
   }
 
-
-  size_t StaticGraph::deduplicateTmpEdges(TmpEdgeInformation* edge_start, TmpEdgeInformation* edge_end) {
+  template<class EdgeMetadataContractionPolicy>
+  size_t StaticGraph::deduplicateTmpEdges(TmpEdgeInformation* edge_start, TmpEdgeInformation* edge_end, const EdgeMetadataContractionPolicy& metadata_contraction_policy) {
     ASSERT(std::distance(edge_start, edge_end) >= 0);
     std::sort(edge_start, edge_end,
               [](const TmpEdgeInformation& e1, const TmpEdgeInformation& e2) {
@@ -435,6 +469,9 @@ namespace mt_kahypar::ds {
       if (valid_edge.getTarget() == next_edge.getTarget()) {
         valid_edge.addWeight(next_edge.getWeight());
         valid_edge.updateID(next_edge.getID());
+        if constexpr (EdgeMetadataContractionPolicy::enabled) {
+          valid_edge.combineMetadata(next_edge.getMetadata(), metadata_contraction_policy);
+        }
         next_edge.invalidate();
       } else {
         edge_start[++valid_edge_index] = next_edge;
@@ -471,6 +508,13 @@ namespace mt_kahypar::ds {
       hypergraph._community_ids = _community_ids;
     }, [&] {
       hypergraph.addFixedVertexSupport(_fixed_vertices.copy());
+    }, [&] {
+      if ( hasEdgeMetadata() ) {
+        ASSERT(_edge_metadata.values.size() == _num_edges);
+        hypergraph._edge_metadata.values.resizeNoAssign(_edge_metadata.values.size());
+        memcpy(hypergraph._edge_metadata.values.data(), _edge_metadata.values.data(),
+              sizeof(EdgeMetadataStorage::Value) * _edge_metadata.values.size());
+      }
     });
     return hypergraph;
   }
@@ -500,6 +544,14 @@ namespace mt_kahypar::ds {
     hypergraph._community_ids = _community_ids;
     hypergraph.addFixedVertexSupport(_fixed_vertices.copy());
 
+    hypergraph._edge_metadata.type = _edge_metadata.type;
+    if ( hasEdgeMetadata() ) {
+      ASSERT(_edge_metadata.values.size() == _num_edges);
+      hypergraph._edge_metadata.values.resizeNoAssign(_edge_metadata.values.size());
+      memcpy(hypergraph._edge_metadata.values.data(), _edge_metadata.values.data(),
+             sizeof(EdgeMetadataStorage::Value) * _edge_metadata.values.size());
+    }
+
     return hypergraph;
   }
 
@@ -510,6 +562,9 @@ namespace mt_kahypar::ds {
     parent->addChild("Communities", sizeof(PartitionID) * _community_ids.capacity());
     if ( hasFixedVertices() ) {
       parent->addChild("Fixed Vertex Support", _fixed_vertices.size_in_bytes());
+    }
+    if (hasEdgeMetadata()) {
+      parent->addChild("Edge Metadata", sizeof(EdgeMetadataStorage::Value)* _edge_metadata.values.size());
     }
   }
 

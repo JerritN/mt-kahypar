@@ -29,6 +29,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include <tbb/parallel_for.h>
 
@@ -38,6 +39,7 @@
 #include "mt-kahypar/datastructures/array.h"
 #include "mt-kahypar/datastructures/hypergraph_common.h"
 #include "mt-kahypar/datastructures/fixed_vertex_support.h"
+#include "mt-kahypar/datastructures/metadata/edge_metadata.h"
 #include "mt-kahypar/parallel/atomic_wrapper.h"
 #include "mt-kahypar/parallel/stl/scalable_vector.h"
 #include "mt-kahypar/partition/context_enum_classes.h"
@@ -350,14 +352,20 @@ class StaticGraph {
     TmpEdgeInformation() :
       _target(kInvalidHyperedge),
       _valid_or_weight(0),
-      _id(kInvalidHyperedge) {
+      _id(kInvalidHyperedge),
+      _metadata{} {
     }
 
     // ! valid edge
-    TmpEdgeInformation(HyperedgeID target, HyperedgeWeight weight, HyperedgeID id) :
-      _target(target),
-      _valid_or_weight(weight),
-      _id(id) {
+    TmpEdgeInformation(
+      HyperedgeID target,
+      HyperedgeWeight weight,
+      HyperedgeID id,
+      EdgeMetadataStorage::Value metadata = {})
+      : _target(target),
+        _valid_or_weight(weight),
+        _id(id),
+        _metadata(metadata) {
       ASSERT(isValid());
     }
 
@@ -380,6 +388,11 @@ class StaticGraph {
       return _id;
     }
 
+    EdgeMetadataStorage::Value getMetadata() const {
+      ASSERT(isValid());
+      return _metadata;
+    }
+
     void invalidate() {
       _valid_or_weight = 0;
     }
@@ -394,10 +407,19 @@ class StaticGraph {
       _id = std::min(_id, id);
     }
 
+    template <class EdgeMetadataContractionPolicy>
+    void combineMetadata(const EdgeMetadataStorage::Value& metadata, const EdgeMetadataContractionPolicy& edge_metadata_contraction_policy) {
+      ASSERT(isValid());
+      _metadata = edge_metadata_contraction_policy.contract(_metadata, metadata);
+    }
+
     HyperedgeID _target;
     HyperedgeWeight _valid_or_weight;
     HyperedgeID _id;
+    EdgeMetadataStorage::Value _metadata;
   };
+
+  static_assert(std::is_trivially_copyable_v<TmpEdgeInformation>, "TmpEdgeInformation must be trivially copyable");
 
   // ! Contains buffers that are needed during multilevel contractions.
   // ! Struct is allocated on top level hypergraph and passed to each contracted
@@ -467,6 +489,7 @@ class StaticGraph {
     _unique_edge_ids(),
     _community_ids(),
     _fixed_vertices(),
+    _edge_metadata(),
     _tmp_contraction_buffer(nullptr) { }
 
   StaticGraph(const StaticGraph&) = delete;
@@ -483,6 +506,7 @@ class StaticGraph {
     _unique_edge_ids(std::move(other._unique_edge_ids)),
     _community_ids(std::move(other._community_ids)),
     _fixed_vertices(std::move(other._fixed_vertices)),
+    _edge_metadata(std::move(other._edge_metadata)),
     _tmp_contraction_buffer(std::move(other._tmp_contraction_buffer)) {
     _fixed_vertices.setHypergraph(this);
     other._tmp_contraction_buffer = nullptr;
@@ -500,6 +524,7 @@ class StaticGraph {
     _community_ids = std::move(other._community_ids),
     _fixed_vertices = std::move(other._fixed_vertices);
     _fixed_vertices.setHypergraph(this);
+    _edge_metadata = std::move(other._edge_metadata);
     _tmp_contraction_buffer = std::move(other._tmp_contraction_buffer);
     other._tmp_contraction_buffer = nullptr;
     return *this;
@@ -762,6 +787,26 @@ class StaticGraph {
     return _fixed_vertices.copy();
   }
 
+  // ######################## Edge Metadata #######################
+
+  void addEdgeMetadata(EdgeMetadataStorage&& edge_metadata) {
+    ASSERT(
+      edge_metadata.type == EdgeMetadataStorage::Type::NONE
+        ? edge_metadata.values.empty()
+        : edge_metadata.values.size() == initialNumEdges(),
+      "Invalid edge metadata size");
+    _edge_metadata = std::move(edge_metadata);
+  }
+
+  bool hasEdgeMetadata() const {
+    return _edge_metadata.type != EdgeMetadataStorage::Type::NONE;
+  }
+
+  const EdgeMetadataStorage& edgeMetadata() const {
+    ASSERT(hasEdgeMetadata(), "Graph has no edge metadata");
+    return _edge_metadata;
+  }
+
   // ####################### Contract / Uncontract #######################
 
   /*!
@@ -941,7 +986,8 @@ class StaticGraph {
   }
 
   // ! Helper function for deduplication of temporary edges. Returns the number of remaining edges
-  static size_t deduplicateTmpEdges(TmpEdgeInformation* edge_start, TmpEdgeInformation* edge_end);
+  template<class EdgeMetadataContractionPolicy>
+  static size_t deduplicateTmpEdges(TmpEdgeInformation* edge_start, TmpEdgeInformation* edge_end, const EdgeMetadataContractionPolicy& metadata_contraction_policy);
 
   // ! Allocate the temporary contraction buffer
   void allocateTmpContractionBuffer() {
@@ -949,6 +995,14 @@ class StaticGraph {
       _tmp_contraction_buffer = new TmpContractionBuffer(_num_nodes, _num_edges);
     }
   }
+
+  // ####################### Contract / Uncontract #######################
+
+  // ! Internal contraction function that contracts a given community structure.
+  template<class EdgeMetadataContractionPolicy>
+  StaticGraph contractImpl(parallel::scalable_vector<HypernodeID>& communities,
+                           const bool deterministic,
+                           const EdgeMetadataContractionPolicy& edge_metadata_propagation_policy);
 
   // ! Number of nodes
   HypernodeID _num_nodes;
@@ -973,6 +1027,9 @@ class StaticGraph {
 
   // ! Fixed Vertex Support
   FixedVertexSupport<StaticGraph> _fixed_vertices;
+
+  // ! Edge Metadata
+  EdgeMetadataStorage _edge_metadata;
 
   // ! Data that is reused throughout the multilevel hierarchy
   // ! to contract the hypergraph and to prevent expensive allocations
