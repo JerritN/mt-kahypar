@@ -43,6 +43,7 @@
 #include "mt-kahypar/datastructures/incident_net_array.h"
 #include "mt-kahypar/datastructures/contraction_tree.h"
 #include "mt-kahypar/datastructures/thread_safe_fast_reset_flag_array.h"
+#include "mt-kahypar/datastructures/metadata/edge_metadata.h"
 #include "mt-kahypar/parallel/stl/scalable_vector.h"
 #include "mt-kahypar/utils/memory_tree.h"
 #include "mt-kahypar/utils/exception.h"
@@ -768,6 +769,25 @@ class DynamicHypergraph {
 
   FixedVertexSupport<DynamicHypergraph> copyOfFixedVertexSupport() const {
     return _fixed_vertices.copy();
+  }
+
+  // ######################## Edge Metadata #######################
+
+  bool hasEdgeMetadata() const noexcept {
+    return false;
+  }
+
+  const EdgeMetadataStorage& edgeMetadata() const {
+    throw UnsupportedOperationException(
+      "Edge metadata is not supported for this graph type.");
+  }
+
+  void addEdgeMetadata(EdgeMetadataStorage&& metadata) {
+    if (metadata.type != EdgeMetadataType::NONE ||
+        !metadata.values.empty()) {
+      throw UnsupportedOperationException(
+        "Edge metadata is not supported for this graph type.");
+    }
   }
 
   // ####################### Contract / Uncontract #######################

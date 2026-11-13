@@ -789,6 +789,15 @@ class StaticGraph {
 
   // ######################## Edge Metadata #######################
 
+  bool hasEdgeMetadata() const noexcept {
+    return _edge_metadata.type != EdgeMetadataStorage::Type::NONE;
+  }
+
+  const EdgeMetadataStorage& edgeMetadata() const {
+    ASSERT(hasEdgeMetadata(), "Graph has no edge metadata");
+    return _edge_metadata;
+  }
+
   void addEdgeMetadata(EdgeMetadataStorage&& edge_metadata) {
     ASSERT(
       edge_metadata.type == EdgeMetadataStorage::Type::NONE
@@ -796,15 +805,6 @@ class StaticGraph {
         : edge_metadata.values.size() == initialNumEdges(),
       "Invalid edge metadata size");
     _edge_metadata = std::move(edge_metadata);
-  }
-
-  bool hasEdgeMetadata() const {
-    return _edge_metadata.type != EdgeMetadataStorage::Type::NONE;
-  }
-
-  const EdgeMetadataStorage& edgeMetadata() const {
-    ASSERT(hasEdgeMetadata(), "Graph has no edge metadata");
-    return _edge_metadata;
   }
 
   // ####################### Contract / Uncontract #######################
