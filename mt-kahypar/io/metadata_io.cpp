@@ -1,4 +1,4 @@
-#pragma once
+#include "mt-kahypar/io/metadata_io.h"
 
 #include "mt-kahypar/datastructures/metadata/edge_metadata.h"
 #include "mt-kahypar/datastructures/static_graph.h"

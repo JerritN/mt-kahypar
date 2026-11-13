@@ -1,5 +1,8 @@
 #pragma once
 
+#include <type_traits>
+
+#include "mt-kahypar/datastructures/array.h"
 #include "mt-kahypar/partition/context_enum_classes.h"
 
 namespace mt_kahypar::ds {

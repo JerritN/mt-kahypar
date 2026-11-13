@@ -56,6 +56,13 @@ int run(int argc, char* argv[]) {
     ERR("No preset specified (--preset-type)");
   }
 
+  const bool has_metadata_file = !context.partition.edge_metadata_filename.empty();
+  const bool has_metadata_type = context.partition.edge_metadata_type != EdgeMetadataType::NONE;
+  if (has_metadata_file != has_metadata_type) {
+    throw InvalidInputException(
+      "--edge-metadata and --edge-metadata-type must be specified together.");
+  }
+
   // Determine instance (graph or hypergraph) and partition type
   if ( context.partition.instance_type == InstanceType::UNDEFINED ) {
     context.partition.instance_type = to_instance_type(context.partition.file_format);

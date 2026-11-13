@@ -491,6 +491,7 @@ namespace mt_kahypar::ds {
     hypergraph._max_removed_degree_zero_hn_weight = _max_removed_degree_zero_hn_weight;
     hypergraph._num_edges = _num_edges;
     hypergraph._total_weight = _total_weight;
+    hypergraph._edge_metadata.type = _edge_metadata.type;
 
     tbb::parallel_invoke([&] {
       hypergraph._nodes.resize(_nodes.size());
