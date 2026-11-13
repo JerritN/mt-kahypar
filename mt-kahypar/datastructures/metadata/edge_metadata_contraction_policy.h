@@ -19,7 +19,7 @@ struct NoEdgeMetadataContractionPolicy {
 struct NaturalEdgeMetadataContractionPolicy {
     static constexpr bool enabled = true;
     static constexpr EdgeMetadataStorage::Type type =
-        EdgeMetadataStorage::Type::NATURAL_EDGE;
+        EdgeMetadataStorage::Type::natural_edge;
 
     using Value = EdgeMetadataStorage::Value;
 

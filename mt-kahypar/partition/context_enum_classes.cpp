@@ -266,6 +266,15 @@ namespace mt_kahypar {
       return os << static_cast<uint8_t>(policy);
   }
 
+  std::ostream & operator<< (std::ostream& os, const EdgeMetadataType& type) {
+      switch (type) {
+        case EdgeMetadataType::NONE: return os << "none";
+        case EdgeMetadataType::natural_edge: return os << "natural_edge";
+          // omit default case to trigger compiler warning for missing cases
+      }
+      return os << static_cast<uint8_t>(type);
+  }
+
   Mode modeFromString(const std::string& mode) {
     if (mode == "rb" || mode == "recursive_bipartitioning") {
       return Mode::recursive_bipartitioning;
@@ -500,5 +509,13 @@ namespace mt_kahypar {
     }
     throw InvalidParameterException("Illegal option: " + policy);
     return SteinerTreeFlowValuePolicy::UNDEFINED;
+  }
+
+  EdgeMetadataType edgeMetadataTypeFromString(const std::string& type) {
+      if (type == "natural_edge") {
+        return EdgeMetadataType::natural_edge;
+      }
+      throw InvalidParameterException("Illegal option: " + type);
+      return EdgeMetadataType::NONE;
   }
 }

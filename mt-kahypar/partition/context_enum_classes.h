@@ -176,6 +176,11 @@ enum class SteinerTreeFlowValuePolicy : uint8_t {
   UNDEFINED
 };
 
+enum class EdgeMetadataType : uint8_t {
+  NONE,
+  natural_edge
+};
+
 std::ostream & operator<< (std::ostream& os, const FileFormat& type);
 
 std::ostream & operator<< (std::ostream& os, const InstanceType& type);
@@ -218,6 +223,8 @@ std::ostream & operator<< (std::ostream& os, const OneToOneMappingStrategy& algo
 
 std::ostream & operator<< (std::ostream& os, const SteinerTreeFlowValuePolicy& policy);
 
+std::ostream & operator<< (std::ostream& os, const EdgeMetadataType& type);
+
 Mode modeFromString(const std::string& mode);
 
 FileFormat fileFormatFromString(const std::string& type);
@@ -253,5 +260,7 @@ RebalancingAlgorithm rebalancingAlgorithmFromString(const std::string& type);
 OneToOneMappingStrategy oneToOneMappingStrategyFromString(const std::string& type);
 
 SteinerTreeFlowValuePolicy steinerTreeFlowValuePolicyFromString(const std::string& policy);
+
+EdgeMetadataType edgeMetadataTypeFromString(const std::string& type);
 
 }  // namesapce mt_kahypar

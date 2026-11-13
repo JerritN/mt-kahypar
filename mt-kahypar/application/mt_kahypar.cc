@@ -125,6 +125,15 @@ int run(int argc, char* argv[]) {
     timer.stop_timer("read_fixed_vertices");
   }
 
+  if ( context.partition.edge_metadata_type != EdgeMetadataType::NONE ) {
+    timer.start_timer("read_edge_metadata", "Read Edge Metadata File");
+    io::addEdgeMetadataFromFile(
+      hypergraph,
+      context.partition.edge_metadata_filename,
+      context.partition.edge_metadata_type);
+    timer.stop_timer("read_edge_metadata");
+  }
+
   // Initialize Memory Pool and Algorithm/Policy Registries
   register_memory_pool(hypergraph, context);
   register_algorithms_and_policies();

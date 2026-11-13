@@ -1,12 +1,11 @@
 #pragma once
 
+#include "mt-kahypar/partition/context_enum_classes.h"
+
 namespace mt_kahypar::ds {
 
 struct EdgeMetadataStorage {
-    enum class Type {
-        NONE,
-        NATURAL_EDGE
-    };
+    using Type = EdgeMetadataType;
 
     union Value {
         bool is_natural_edge;

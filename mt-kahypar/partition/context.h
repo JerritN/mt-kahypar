@@ -43,6 +43,7 @@ struct PartitioningParameters {
   InstanceType instance_type = InstanceType::UNDEFINED;
   PresetType preset_type = PresetType::UNDEFINED;
   mt_kahypar_partition_type_t partition_type =  NULLPTR_PARTITION;
+  EdgeMetadataType edge_metadata_type = EdgeMetadataType::NONE;
   double epsilon = std::numeric_limits<double>::max();
   PartitionID k = std::numeric_limits<PartitionID>::max();
   int seed = 0;
@@ -76,6 +77,7 @@ struct PartitioningParameters {
   std::string graph_filename { };
   std::string fixed_vertex_filename { };
   std::string input_partition_filename { };
+  std::string edge_metadata_filename { };
   std::string graph_partition_output_folder {};
   std::string graph_partition_filename { };
   std::string graph_community_filename { };

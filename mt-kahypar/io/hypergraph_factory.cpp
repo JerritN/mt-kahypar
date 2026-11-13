@@ -29,6 +29,7 @@
 #include "mt-kahypar/macros.h"
 #include "mt-kahypar/definitions.h"
 #include "mt-kahypar/io/hypergraph_io.h"
+#include "mt-kahypar/io/metadata_io.h"
 #include "mt-kahypar/datastructures/fixed_vertex_support.h"
 #include "mt-kahypar/partition/conversion.h"
 #include "mt-kahypar/utils/exception.h"
@@ -297,6 +298,24 @@ void removeFixedVertices(mt_kahypar_hypergraph_t hypergraph) {
     )
     case NULLPTR_HYPERGRAPH:
     default: break;
+  }
+}
+
+void addEdgeMetadataFromFile(mt_kahypar_hypergraph_t hypergraph,
+                            const std::string& filename,
+                            EdgeMetadataType type) {
+  switch (hypergraph.type) {
+    ENABLE_GRAPHS(case STATIC_GRAPH: {
+        auto& graph = utils::cast<ds::StaticGraph>(hypergraph);
+        auto metadata = readEdgeMetadataForGraph(graph, filename, type);
+        graph.addEdgeMetadata(std::move(metadata));
+        return;
+      }
+    )
+
+    default:
+      throw UnsupportedOperationException(
+        "Edge metadata is currently supported only for StaticGraph");
   }
 }
 

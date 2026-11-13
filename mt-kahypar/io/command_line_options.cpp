@@ -237,6 +237,18 @@ namespace mt_kahypar {
       "Input partition file: improves the given partition with V-cycles instead of partitioning from scratch."
     )->check(CLI::ExistingFile);
     app.add_option(
+      "--edge-metadata",
+      context.partition.edge_metadata_filename,
+      "Edge metadata file: allows for specialized algorithms that take edge metadata into account."
+    )->check(CLI::ExistingFile);
+    app.add_option_function<std::string>(
+      "--edge-metadata-type", [&](const std::string& s) {
+        context.partition.edge_metadata_type = edgeMetadataTypeFromString(s);
+      },
+      "Edge metadata type:\n"
+      " - natural_edge"
+    )->check(CLI::IsMember({"natural_edge"}));
+    app.add_option(
       "--part-weights",
       context.partition.max_part_weights,
       "Use the specified individual part weights instead of epsilon."

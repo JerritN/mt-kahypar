@@ -58,7 +58,7 @@ namespace mt_kahypar::ds {
       case EdgeMetadataStorage::Type::NONE:
         return contractImpl(communities, deterministic, NoEdgeMetadataContractionPolicy{});
 
-      case EdgeMetadataStorage::Type::NATURAL_EDGE:
+      case EdgeMetadataStorage::Type::natural_edge:
         return contractImpl(communities, deterministic, NaturalEdgeMetadataContractionPolicy{});
     }
 
