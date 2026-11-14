@@ -937,6 +937,7 @@ private:
       edge_vector.resize(num_edges);
       edge_weight.resize(num_edges);
       if ( has_metadata ) {
+        edge_metadata.type = _hg->edgeMetadataType();
         edge_metadata.values.resize(num_edges);
       }
 
@@ -971,6 +972,10 @@ private:
     extracted_block.hg = HypergraphFactory::construct_from_graph_edges(
       num_nodes, num_edges, edge_vector, edge_weight.data(), node_weight.data(),
       stable_construction_of_incident_edges);
+
+    if ( has_metadata ) {
+      extracted_block.hg.addEdgeMetadata(edge_metadata);
+    }
 
     // Set community ids
     doParallelForAllNodes([&](const HypernodeID& node) {
