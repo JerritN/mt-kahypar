@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-#include "mt-kahypar/datastructures/array.h"
+#include "mt-kahypar/parallel/stl/scalable_vector.h"
 #include "mt-kahypar/partition/context_enum_classes.h"
 
 namespace mt_kahypar::ds {
@@ -17,7 +17,7 @@ struct EdgeMetadataInput {
   EdgeMetadataType type = EdgeMetadataType::NONE;
 
   // Indexed by graph unique edge ID.
-  Array<EdgeMetadataValue> values;
+  vec<EdgeMetadataValue> values;
 };
 
 }  // namespace mt_kahypar::ds

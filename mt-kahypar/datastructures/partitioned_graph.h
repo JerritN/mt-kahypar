@@ -41,6 +41,7 @@
 #include "mt-kahypar/datastructures/connectivity_set.h"
 #include "mt-kahypar/datastructures/synchronized_edge_update.h"
 #include "mt-kahypar/datastructures/thread_safe_fast_reset_flag_array.h"
+#include "mt-kahypar/datastructures/metadata/edge_metadata.h"
 #include "mt-kahypar/parallel/atomic_wrapper.h"
 #include "mt-kahypar/parallel/stl/scalable_vector.h"
 #include "mt-kahypar/parallel/stl/thread_locals.h"
@@ -930,16 +931,26 @@ private:
     EdgeVector edge_vector;
     vec<HyperedgeWeight> edge_weight;
     vec<HypernodeWeight> node_weight;
+    const bool has_metadata = _hg->hasEdgeMetadata();
+    EdgeMetadataInput edge_metadata;
     tbb::parallel_invoke([&] {
       edge_vector.resize(num_edges);
       edge_weight.resize(num_edges);
+      if ( has_metadata ) {
+        edge_metadata.values.resize(num_edges);
+      }
+
       doParallelForAllEdges([&](const HyperedgeID edge) {
         const HypernodeID source = edgeSource(edge);
         const HypernodeID target = edgeTarget(edge);
         if (partID(source) == block && partID(target) == block && source < target) {
-          ASSERT(he_mapping[edge] < num_edges);
-          edge_weight[he_mapping[edge]] = edgeWeight(edge);
-          edge_vector[he_mapping[edge]] = {node_mapping[source], node_mapping[target]};
+          const HyperedgeID mapped_edge = he_mapping[edge];
+          ASSERT(mapped_edge < num_edges);
+          edge_weight[mapped_edge] = edgeWeight(edge);
+          edge_vector[mapped_edge] = {node_mapping[source], node_mapping[target]};
+          if ( has_metadata ) {
+            edge_metadata.values[mapped_edge] = _hg->edgeMetadata(edge);
+          }
         }
       });
     }, [&] {
@@ -1034,6 +1045,8 @@ private:
     vec<EdgeVector> edge_vector(k);
     vec<vec<HyperedgeWeight>> edge_weight(k);
     vec<vec<HypernodeWeight>> node_weight(k);
+    bool has_metadata = _hg->hasEdgeMetadata();
+    vec<EdgeMetadataInput> edge_metadata(k);
     // Allocate auxilliary graph data structures
     tbb::parallel_for(static_cast<PartitionID>(0), k, [&](const PartitionID p) {
       const HypernodeID num_nodes = nodes_cnt[p];
@@ -1048,6 +1061,11 @@ private:
         if ( already_cut ) {
           // Extracted graph only contains non-cut edges
           extracted_blocks[p].already_cut.assign(num_edges, 0);
+        }
+      }, [&] {
+        if ( has_metadata ) {
+          edge_metadata[p].type = _hg->edgeMetadataType();
+          edge_metadata[p].values.resize(num_edges);
         }
       });
     });
@@ -1065,6 +1083,9 @@ private:
           edge_weight[sourceBlock][mapped_he] = edgeWeight(he);
           edge_vector[sourceBlock][mapped_he] =
             { hn_mapping[edgeSource(he)], hn_mapping[edgeTarget(he)] };
+          if ( has_metadata ) {
+            edge_metadata[sourceBlock].values[mapped_he] = _hg->edgeMetadata(he);
+          }
         }
       });
     }, [&] {
@@ -1085,6 +1106,11 @@ private:
       extracted_blocks[p].hg = HypergraphFactory::construct_from_graph_edges(
         num_nodes, num_edges, edge_vector[p], edge_weight[p].data(), node_weight[p].data(),
         stable_construction_of_incident_edges);
+
+      if ( has_metadata ) {
+        extracted_blocks[p].hg.addEdgeMetadata(edge_metadata[p]);
+        parallel::free(edge_metadata[p].values);
+      }
     });
 
     // Set community ids
