@@ -733,16 +733,29 @@ class StaticHypergraph {
 
   // ######################## Edge Metadata #######################
 
+  // Returns whether the hypergraph has edge metadata or not
   bool hasEdgeMetadata() const noexcept {
     return false;
   }
 
-  const EdgeMetadataStorage& edgeMetadata() const {
+  // Returns the type of edge metadata stored in the hypergraph
+  EdgeMetadataType edgeMetadataType() const noexcept {
+    return EdgeMetadataType::NONE;
+  }
+
+  /*!
+  * (Not supported.)
+  */
+  const EdgeMetadataValue& edgeMetadata(const HyperedgeID e) const {
+    unused(e);
     throw UnsupportedOperationException(
       "Edge metadata is not supported for this graph type.");
   }
 
-  void addEdgeMetadata(EdgeMetadataStorage&& metadata) {
+  /*!
+  * (Not supported.)
+  */
+  void addEdgeMetadata(const EdgeMetadataInput& metadata) {
     if (metadata.type != EdgeMetadataType::NONE ||
         !metadata.values.empty()) {
       throw UnsupportedOperationException(

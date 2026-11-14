@@ -46,6 +46,7 @@
 #include "mt-kahypar/datastructures/thread_safe_fast_reset_flag_array.h"
 #include "mt-kahypar/datastructures/metadata/edge_metadata.h"
 #include "mt-kahypar/parallel/stl/scalable_vector.h"
+#include "mt-kahypar/partition/context_enum_classes.h"
 #include "mt-kahypar/utils/memory_tree.h"
 #include "mt-kahypar/utils/exception.h"
 
@@ -679,16 +680,29 @@ class DynamicGraph {
 
   // ######################## Edge Metadata #######################
 
+  // Returns whether the hypergraph has edge metadata or not
   bool hasEdgeMetadata() const noexcept {
     return false;
   }
 
-  const EdgeMetadataStorage& edgeMetadata() const {
+  // Returns the type of edge metadata stored in the hypergraph
+  EdgeMetadataType edgeMetadataType() const noexcept {
+    return EdgeMetadataType::NONE;
+  }
+
+  /*!
+  * (Not supported.)
+  */
+  const EdgeMetadataValue& edgeMetadata(const HyperedgeID e) const {
+    unused(e);
     throw UnsupportedOperationException(
       "Edge metadata is not supported for this graph type.");
   }
 
-  void addEdgeMetadata(EdgeMetadataStorage&& metadata) {
+  /*!
+  * (Not supported.)
+  */
+  void addEdgeMetadata(const EdgeMetadataInput& metadata) {
     if (metadata.type != EdgeMetadataType::NONE ||
         !metadata.values.empty()) {
       throw UnsupportedOperationException(

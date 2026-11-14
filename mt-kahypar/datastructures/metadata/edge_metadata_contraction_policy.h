@@ -6,10 +6,10 @@ namespace mt_kahypar::ds {
 
 struct NoEdgeMetadataContractionPolicy {
     static constexpr bool enabled = false;
-    static constexpr EdgeMetadataStorage::Type type =
-        EdgeMetadataStorage::Type::NONE;
+    static constexpr EdgeMetadataType type =
+        EdgeMetadataType::NONE;
 
-    using Value = EdgeMetadataStorage::Value;
+    using Value = EdgeMetadataValue;
 
     Value contract(const Value&, const Value&) const noexcept {
         return Value{};
@@ -18,10 +18,10 @@ struct NoEdgeMetadataContractionPolicy {
 
 struct NaturalEdgeMetadataContractionPolicy {
     static constexpr bool enabled = true;
-    static constexpr EdgeMetadataStorage::Type type =
-        EdgeMetadataStorage::Type::natural_edge;
+    static constexpr EdgeMetadataType type =
+        EdgeMetadataType::natural_edge;
 
-    using Value = EdgeMetadataStorage::Value;
+    using Value = EdgeMetadataValue;
 
     Value contract(const Value& lhs, const Value& rhs) const noexcept {
         Value result{};

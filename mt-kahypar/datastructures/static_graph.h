@@ -361,7 +361,7 @@ class StaticGraph {
       HyperedgeID target,
       HyperedgeWeight weight,
       HyperedgeID id,
-      EdgeMetadataStorage::Value metadata = {})
+      EdgeMetadataValue metadata = {})
       : _target(target),
         _valid_or_weight(weight),
         _id(id),
@@ -388,7 +388,7 @@ class StaticGraph {
       return _id;
     }
 
-    EdgeMetadataStorage::Value getMetadata() const {
+    EdgeMetadataValue getMetadata() const {
       ASSERT(isValid());
       return _metadata;
     }
@@ -408,7 +408,7 @@ class StaticGraph {
     }
 
     template <class EdgeMetadataContractionPolicy>
-    void combineMetadata(const EdgeMetadataStorage::Value& metadata, const EdgeMetadataContractionPolicy& edge_metadata_contraction_policy) {
+    void combineMetadata(const EdgeMetadataValue& metadata, const EdgeMetadataContractionPolicy& edge_metadata_contraction_policy) {
       ASSERT(isValid());
       _metadata = edge_metadata_contraction_policy.contract(_metadata, metadata);
     }
@@ -416,7 +416,7 @@ class StaticGraph {
     HyperedgeID _target;
     HyperedgeWeight _valid_or_weight;
     HyperedgeID _id;
-    EdgeMetadataStorage::Value _metadata;
+    EdgeMetadataValue _metadata;
   };
 
   static_assert(std::is_trivially_copyable_v<TmpEdgeInformation>, "TmpEdgeInformation must be trivially copyable");
@@ -489,7 +489,8 @@ class StaticGraph {
     _unique_edge_ids(),
     _community_ids(),
     _fixed_vertices(),
-    _edge_metadata(),
+    _edge_metadata_type(EdgeMetadataType::NONE),
+    _edge_metadata_values(),
     _tmp_contraction_buffer(nullptr) { }
 
   StaticGraph(const StaticGraph&) = delete;
@@ -506,7 +507,8 @@ class StaticGraph {
     _unique_edge_ids(std::move(other._unique_edge_ids)),
     _community_ids(std::move(other._community_ids)),
     _fixed_vertices(std::move(other._fixed_vertices)),
-    _edge_metadata(std::move(other._edge_metadata)),
+    _edge_metadata_type(other._edge_metadata_type),
+    _edge_metadata_values(std::move(other._edge_metadata_values)),
     _tmp_contraction_buffer(std::move(other._tmp_contraction_buffer)) {
     _fixed_vertices.setHypergraph(this);
     other._tmp_contraction_buffer = nullptr;
@@ -524,7 +526,8 @@ class StaticGraph {
     _community_ids = std::move(other._community_ids),
     _fixed_vertices = std::move(other._fixed_vertices);
     _fixed_vertices.setHypergraph(this);
-    _edge_metadata = std::move(other._edge_metadata);
+    _edge_metadata_type = other._edge_metadata_type;
+    _edge_metadata_values = std::move(other._edge_metadata_values);
     _tmp_contraction_buffer = std::move(other._tmp_contraction_buffer);
     other._tmp_contraction_buffer = nullptr;
     return *this;
@@ -789,22 +792,44 @@ class StaticGraph {
 
   // ######################## Edge Metadata #######################
 
+  // Returns whether the hypergraph has edge metadata or not
   bool hasEdgeMetadata() const noexcept {
-    return _edge_metadata.type != EdgeMetadataStorage::Type::NONE;
+    return _edge_metadata_type != EdgeMetadataType::NONE;
   }
 
-  const EdgeMetadataStorage& edgeMetadata() const {
+  // Returns the type of edge metadata stored in the hypergraph
+  EdgeMetadataType edgeMetadataType() const noexcept {
+    return _edge_metadata_type;
+  }
+
+  // Returns metadata for an internal adjacency edge ID.
+  const EdgeMetadataValue& edgeMetadata(const HyperedgeID e) const {
     ASSERT(hasEdgeMetadata(), "Graph has no edge metadata");
-    return _edge_metadata;
+    ASSERT(e < _edge_metadata_values.size(), "Invalid edge metadata index");
+    return _edge_metadata_values[e];
   }
 
-  void addEdgeMetadata(EdgeMetadataStorage&& edge_metadata) {
-    ASSERT(
-      edge_metadata.type == EdgeMetadataStorage::Type::NONE
-        ? edge_metadata.values.empty()
-        : edge_metadata.values.size() == initialNumEdges(),
-      "Invalid edge metadata size");
-    _edge_metadata = std::move(edge_metadata);
+  // Input values are indexed by unique edge ID.
+  // Replaces existing metadata; NONE clears it.
+  void addEdgeMetadata(const EdgeMetadataInput& metadata) {
+    if (metadata.type == EdgeMetadataType::NONE) {
+      ALWAYS_ASSERT(metadata.values.empty(), "Edge metadata values must be empty for type NONE");
+      _edge_metadata_values = { };
+      _edge_metadata_type = EdgeMetadataType::NONE;
+      return;
+    }
+
+    ALWAYS_ASSERT(metadata.values.size() == maxUniqueID(), "Expected one metadata value per unique edge ID.");
+
+    Array<EdgeMetadataValue> expanded{};
+    expanded.resizeNoAssign(initialNumEdges());
+
+    doParallelForAllEdges([&](const HyperedgeID edge) {
+      expanded[edge] = metadata.values[uniqueEdgeID(edge)]; // copy
+    });
+
+    _edge_metadata_values = std::move(expanded);
+    _edge_metadata_type = metadata.type;
   }
 
   // ####################### Contract / Uncontract #######################
@@ -1029,7 +1054,10 @@ class StaticGraph {
   FixedVertexSupport<StaticGraph> _fixed_vertices;
 
   // ! Edge Metadata
-  EdgeMetadataStorage _edge_metadata;
+  EdgeMetadataType _edge_metadata_type = EdgeMetadataType::NONE;
+
+  // Indexed by internal adjacency edge ID.
+  Array<EdgeMetadataValue> _edge_metadata_values;
 
   // ! Data that is reused throughout the multilevel hierarchy
   // ! to contract the hypergraph and to prevent expensive allocations

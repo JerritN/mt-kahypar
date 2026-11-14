@@ -5,7 +5,7 @@
 #include "mt-kahypar/partition/context_enum_classes.h"
 
 namespace mt_kahypar::io {
-    ds::EdgeMetadataStorage readEdgeMetadataForGraph(
+    ds::EdgeMetadataInput readEdgeMetadataForGraph(
         const ds::StaticGraph& graph,
         const std::string& filename,
         EdgeMetadataType type) {
