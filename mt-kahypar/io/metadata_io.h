@@ -72,7 +72,7 @@ namespace mt_kahypar::io {
 
   template<class Graph>
   EdgeLookup buildEdgeLookup(const Graph& graph) {
-    EdgeLookup lookup = EdgeLookup(graph.maxUniqueID());
+    EdgeLookup lookup;
     lookup.reserve(graph.maxUniqueID());
 
     for (const HyperedgeID& he : graph.edges()) {
