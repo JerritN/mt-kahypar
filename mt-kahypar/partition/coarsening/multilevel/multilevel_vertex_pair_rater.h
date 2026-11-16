@@ -40,6 +40,7 @@
 #include "mt-kahypar/datastructures/sparse_map.h"
 #include "mt-kahypar/partition/context.h"
 #include "mt-kahypar/partition/coarsening/policies/rating_fixed_vertex_acceptance_policy.h"
+#include "mt-kahypar/partition/coarsening/policies/rating_edge_metadata_policy.h"
 
 
 namespace mt_kahypar {
@@ -112,7 +113,7 @@ class MultilevelVertexPairRater {
   MultilevelVertexPairRater & operator= (MultilevelVertexPairRater &&) = delete;
 
   template<typename ScorePolicy, typename HeavyNodePenaltyPolicy, typename AcceptancePolicy,
-           bool has_fixed_vertices, typename Hypergraph>
+           typename MetadataScorePolicy, bool has_fixed_vertices, typename Hypergraph>
   VertexPairRating rate(const Hypergraph& hypergraph,
                         const HypernodeID u,
                         const parallel::scalable_vector<HypernodeID>& cluster_ids,
@@ -122,17 +123,17 @@ class MultilevelVertexPairRater {
 
     const RatingMapType rating_map_type = getRatingMapTypeForRatingOfHypernode(hypergraph, u);
     if ( rating_map_type == RatingMapType::CACHE_EFFICIENT_RATING_MAP ) {
-      return rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy, has_fixed_vertices>(
+      return rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy, MetadataScorePolicy, has_fixed_vertices>(
         hypergraph, u, _local_cache_efficient_rating_map.local(),
         cluster_ids, cluster_weight, fixed_vertices, max_allowed_node_weight, false);
     } else if ( rating_map_type == RatingMapType::VERTEX_DEGREE_BOUNDED_RATING_MAP ) {
-      return rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy, has_fixed_vertices>(
+      return rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy, MetadataScorePolicy, has_fixed_vertices>(
         hypergraph, u, _local_vertex_degree_bounded_rating_map.local(),
         cluster_ids, cluster_weight, fixed_vertices, max_allowed_node_weight, true);
     } else {
       LargeTmpRatingMap& large_tmp_rating_map = _local_large_rating_map.local();
       large_tmp_rating_map.setMaxSize(_current_num_nodes);
-      return rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy, has_fixed_vertices>(
+      return rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy, MetadataScorePolicy, has_fixed_vertices>(
         hypergraph, u, large_tmp_rating_map,
         cluster_ids, cluster_weight, fixed_vertices, max_allowed_node_weight, false);
     }
@@ -156,7 +157,8 @@ class MultilevelVertexPairRater {
 
  private:
   template<typename ScorePolicy, typename HeavyNodePenaltyPolicy, typename AcceptancePolicy,
-           bool has_fixed_vertices, typename Hypergraph, typename RatingMap>
+           typename MetadataScorePolicy, bool has_fixed_vertices, typename Hypergraph,
+           typename RatingMap>
   VertexPairRating rate(const Hypergraph& hypergraph,
                         const HypernodeID u,
                         RatingMap& tmp_ratings,
@@ -167,9 +169,9 @@ class MultilevelVertexPairRater {
                         const bool use_vertex_degree_sampling) {
 
     if ( use_vertex_degree_sampling ) {
-      fillRatingMapWithSampling<ScorePolicy>(hypergraph, u, tmp_ratings, cluster_ids);
+      fillRatingMapWithSampling<ScorePolicy, MetadataScorePolicy>(hypergraph, u, tmp_ratings, cluster_ids);
     } else {
-      fillRatingMap<ScorePolicy>(hypergraph, u, tmp_ratings, cluster_ids);
+      fillRatingMap<ScorePolicy, MetadataScorePolicy>(hypergraph, u, tmp_ratings, cluster_ids);
     }
 
     int cpu_id = THREAD_ID;
@@ -215,7 +217,7 @@ class MultilevelVertexPairRater {
     return ret;
   }
 
-  template<typename ScorePolicy, typename Hypergraph, typename RatingMap>
+  template<typename ScorePolicy, typename MetadataScorePolicy, typename Hypergraph, typename RatingMap>
   void fillRatingMap(const Hypergraph& hypergraph,
                      const HypernodeID u,
                      RatingMap& tmp_ratings,
@@ -223,9 +225,12 @@ class MultilevelVertexPairRater {
     if constexpr (Hypergraph::is_graph) {
       for ( const HyperedgeID& he : hypergraph.incidentEdges(u) ) {
         const RatingType score = ScorePolicy::score(hypergraph.edgeWeight(he), hypergraph.edgeSize(he));
+        const MetadataRating metadata_score = MetadataScorePolicy::evaluate(hypergraph, he, score);
         const HypernodeID representative = cluster_ids[hypergraph.edgeTarget(he)];
         ASSERT(representative < hypergraph.initialNumNodes());
-        tmp_ratings[representative] += score;
+        if ( metadata_score.include ) {
+          tmp_ratings[representative] += metadata_score.score;
+        }
       }
     } else {
       kahypar::ds::FastResetFlagArray<>& bloom_filter = _local_bloom_filter.local();
@@ -252,7 +257,7 @@ class MultilevelVertexPairRater {
     }
   }
 
-  template<typename ScorePolicy, typename Hypergraph, typename RatingMap>
+  template<typename ScorePolicy, typename MetadataScorePolicy, typename Hypergraph, typename RatingMap>
   void fillRatingMapWithSampling(const Hypergraph& hypergraph,
                                  const HypernodeID u,
                                  RatingMap& tmp_ratings,
@@ -266,10 +271,13 @@ class MultilevelVertexPairRater {
           break;
         }
         const RatingType score = ScorePolicy::score(hypergraph.edgeWeight(he), hypergraph.edgeSize(he));
+        const MetadataRating metadata_score = MetadataScorePolicy::evaluate(hypergraph, he, score);
         const HypernodeID representative = cluster_ids[hypergraph.edgeTarget(he)];
         ASSERT(representative < hypergraph.initialNumNodes());
-        tmp_ratings[representative] += score;
-        ++num_tmp_rating_map_accesses;
+        if ( metadata_score.include ) {
+          tmp_ratings[representative] += metadata_score.score;
+          ++num_tmp_rating_map_accesses;
+        }
       }
     } else {
       kahypar::ds::FastResetFlagArray<>& bloom_filter = _local_bloom_filter.local();

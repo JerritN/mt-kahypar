@@ -46,6 +46,7 @@
 #include "mt-kahypar/partition/coarsening/policies/rating_acceptance_policy.h"
 #include "mt-kahypar/partition/coarsening/policies/rating_heavy_node_penalty_policy.h"
 #include "mt-kahypar/partition/coarsening/policies/rating_score_policy.h"
+#include "mt-kahypar/partition/coarsening/policies/rating_edge_metadata_policy.h"
 #include "mt-kahypar/utils/cast.h"
 #include "mt-kahypar/utils/exception.h"
 #include "mt-kahypar/utils/progress_bar.h"
@@ -58,7 +59,8 @@ namespace mt_kahypar {
 template <class TypeTraits = Mandatory,
           class ScorePolicy = HeavyEdgeScore,
           class HeavyNodePenaltyPolicy = NoWeightPenalty,
-          class AcceptancePolicy = BestRatingPreferringUnmatched>
+          class AcceptancePolicy = BestRatingPreferringUnmatched,
+          class MetadataScorePolicy = IgnoreEdgeMetadataPolicy>
 class MultilevelCoarsener : public ICoarsener,
                             private MultilevelCoarsenerBase<TypeTraits> {
  private:
@@ -200,7 +202,7 @@ class MultilevelCoarsener : public ICoarsener,
       //  1.) The contraction limit of the current level is not reached
       //  2.) Vertex hn is not matched before
       if (current_hg.nodeIsEnabled(hn) && cc.shouldContinue() && cc.vertexIsUnmatched(hn)) {
-        const Rating rating = cc.template rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy>(current_hg, hn);
+        const Rating rating = cc.template rate<ScorePolicy, HeavyNodePenaltyPolicy, AcceptancePolicy, MetadataScorePolicy>(current_hg, hn);
         if (rating.target != kInvalidHypernode) {
           cc.matchVertices(current_hg, hn, rating.target);
         }
