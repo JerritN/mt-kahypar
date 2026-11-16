@@ -99,6 +99,9 @@ class MultilevelCoarsener : public ICoarsener,
     if (_context.coarsening.maximum_shrink_factor <= _context.coarsening.minimum_shrink_factor) {
       throw InvalidParameterException("Value for c-max-shrink-factor too small, must be larger than c-min-shrink-factor");
     }
+    if (!MetadataScorePolicy::isApplicable(_hg.edgeMetadataType())) {
+      throw InvalidParameterException("Edge metadata rating policy is not applicable for the given hypergraph edge metadata type");
+    }
 
     _progress_bar += _hg.numRemovedHypernodes();
     _current_vertices.resize(_hg.initialNumNodes());

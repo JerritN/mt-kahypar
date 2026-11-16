@@ -33,6 +33,7 @@
 #include "mt-kahypar/partition/coarsening/policies/rating_acceptance_policy.h"
 #include "mt-kahypar/partition/coarsening/policies/rating_heavy_node_penalty_policy.h"
 #include "mt-kahypar/partition/coarsening/policies/rating_score_policy.h"
+#include "mt-kahypar/partition/coarsening/policies/rating_edge_metadata_policy.h"
 #include "mt-kahypar/partition/refinement/gains/gain_definitions.h"
 #include "mt-kahypar/partition/context_enum_classes.h"
 #include "mt-kahypar/partition/thread_safe_policy_registry.h"
@@ -91,6 +92,18 @@ void register_policies() {
   REGISTER_POLICY(AcceptancePolicy, AcceptancePolicy::best,
                   BestRatingWithTieBreaking);
   #endif
+
+  REGISTER_POLICY(EdgeMetadataRatingPolicy, EdgeMetadataRatingPolicy::ignore,
+                  IgnoreEdgeMetadataPolicy);
+
+  REGISTER_POLICY(EdgeMetadataRatingPolicy, EdgeMetadataRatingPolicy::skip_natural_edge,
+                  SkipNaturalEdgePolicy);
+
+  REGISTER_POLICY(EdgeMetadataRatingPolicy, EdgeMetadataRatingPolicy::natural_edge_contribute_zero,
+                  NaturalEdgeContributeZeroPolicy);
+
+  REGISTER_POLICY(EdgeMetadataRatingPolicy, EdgeMetadataRatingPolicy::natural_edge_contribute_negative,
+                  NaturalEdgeContributeNegativePolicy);
 
   // //////////////////////////////////////////////////////////////////////////////
   //                            Gain Type Policies

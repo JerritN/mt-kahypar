@@ -181,6 +181,13 @@ enum class EdgeMetadataType : uint8_t {
   natural_edge
 };
 
+enum class EdgeMetadataRatingPolicy : uint8_t {
+  ignore,
+  skip_natural_edge,
+  natural_edge_contribute_zero,
+  natural_edge_contribute_negative
+};
+
 std::ostream & operator<< (std::ostream& os, const FileFormat& type);
 
 std::ostream & operator<< (std::ostream& os, const InstanceType& type);
@@ -225,6 +232,8 @@ std::ostream & operator<< (std::ostream& os, const SteinerTreeFlowValuePolicy& p
 
 std::ostream & operator<< (std::ostream& os, const EdgeMetadataType& type);
 
+std::ostream & operator<< (std::ostream& os, const EdgeMetadataRatingPolicy& policy);
+
 Mode modeFromString(const std::string& mode);
 
 FileFormat fileFormatFromString(const std::string& type);
@@ -263,4 +272,6 @@ SteinerTreeFlowValuePolicy steinerTreeFlowValuePolicyFromString(const std::strin
 
 EdgeMetadataType edgeMetadataTypeFromString(const std::string& type);
 
-}  // namesapce mt_kahypar
+EdgeMetadataRatingPolicy edgeMetadataRatingPolicyFromString(const std::string& policy);
+
+}  // namespace mt_kahypar

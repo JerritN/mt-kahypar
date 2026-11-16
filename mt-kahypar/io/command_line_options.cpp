@@ -539,6 +539,16 @@ namespace mt_kahypar {
       #endif
       "- best_prefer_unmatched"
     )->capture_default_str();
+    app.add_option_function<std::string>(
+      "--c-rating-edge-metadata", [&](const std::string& s) {
+        context.coarsening.rating.edge_metadata_policy = edgeMetadataRatingPolicyFromString(s);
+      },
+      "Edge metadata rating policy:\n"
+      "- ignore\n"
+      "- skip_natural_edge\n"
+      "- natural_edge_contribute_zero\n"
+      "- natural_edge_contribute_negative"
+    )->capture_default_str();
     app.add_option(
       "--c-vertex-degree-sampling-threshold",
       context.coarsening.vertex_degree_sampling_threshold,

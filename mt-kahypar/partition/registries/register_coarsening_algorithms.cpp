@@ -40,10 +40,10 @@
 #include "mt-kahypar/partition/coarsening/do_nothing_coarsener.h"
 #include "mt-kahypar/partition/coarsening/policies/rating_acceptance_policy.h"
 #include "mt-kahypar/partition/coarsening/policies/rating_heavy_node_penalty_policy.h"
+#include "mt-kahypar/partition/coarsening/policies/rating_edge_metadata_policy.h"
 #include "mt-kahypar/partition/context.h"
 #include "mt-kahypar/partition/factories.h"
 #include "mt-kahypar/partition/thread_safe_policy_registry.h"
-
 
 namespace mt_kahypar {
 using MultilevelCoarsenerDispatcher = kahypar::meta::StaticMultiDispatchFactory<MultilevelCoarsener,
@@ -51,7 +51,8 @@ using MultilevelCoarsenerDispatcher = kahypar::meta::StaticMultiDispatchFactory<
                                                                                 kahypar::meta::Typelist<MultilevelTypeTraitsList,
                                                                                                         RatingScorePolicies,
                                                                                                         HeavyNodePenaltyPolicies,
-                                                                                                        AcceptancePolicies> >;
+                                                                                                        AcceptancePolicies,
+                                                                                                        EdgeMetadataRatingPolicies> >;
 
 using DeterministicCoarsenerDispatcher = kahypar::meta::StaticMultiDispatchFactory<DeterministicMultilevelCoarsener,
                                                                                    ICoarsener,
@@ -91,7 +92,10 @@ void register_coarsening_algorithms() {
                                 ThreadSafePolicyRegistry<HeavyNodePenaltyPolicy>::getInstance().getPolicy(
                                   context.coarsening.rating.heavy_node_penalty_policy),
                                 ThreadSafePolicyRegistry<AcceptancePolicy>::getInstance().getPolicy(
-                                  context.coarsening.rating.acceptance_policy));
+                                  context.coarsening.rating.acceptance_policy),
+                                ThreadSafePolicyRegistry<EdgeMetadataRatingPolicy>::getInstance().getPolicy(
+                                  context.coarsening.rating.edge_metadata_policy)
+                                );
 
   #ifdef KAHYPAR_ENABLE_HIGHEST_QUALITY_FEATURES
   REGISTER_DISPATCHED_COARSENER(CoarseningAlgorithm::nlevel_coarsener,

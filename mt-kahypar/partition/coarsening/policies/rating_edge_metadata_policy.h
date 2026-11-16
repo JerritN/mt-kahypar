@@ -2,13 +2,23 @@
 
 #include "mt-kahypar/datastructures/hypergraph_common.h"
 
+#include "kahypar-resources/meta/policy_registry.h"
+#include "kahypar-resources/meta/typelist.h"
+
 namespace mt_kahypar {
+  using PolicyBase = kahypar::meta::PolicyBase;
+  using PolicyRegistry = kahypar::meta::PolicyRegistry<PolicyBase>;
+
   struct MetadataRating {
     bool include;
     RatingType score;
   };
 
-  struct IgnoreEdgeMetadataPolicy {
+  struct IgnoreEdgeMetadataPolicy final : public PolicyBase {
+    static bool isApplicable(const EdgeMetadataType) {
+      return true;
+    }
+
     template<class Graph>
     static MetadataRating evaluate(
         const Graph&, HyperedgeID, RatingType score) {
@@ -16,7 +26,11 @@ namespace mt_kahypar {
     }
   };
 
-  struct SkipNaturalEdgePolicy {
+  struct SkipNaturalEdgePolicy final : public PolicyBase {
+    static bool isApplicable(const EdgeMetadataType type) {
+      return type == EdgeMetadataType::natural_edge;
+    }
+
     template<class Graph>
     static MetadataRating evaluate(
         const Graph& graph, HyperedgeID edge, RatingType score) {
@@ -25,7 +39,11 @@ namespace mt_kahypar {
     }
   };
 
-  struct NaturalEdgeContributeZeroPolicy {
+  struct NaturalEdgeContributeZeroPolicy final : public PolicyBase {
+    static bool isApplicable(const EdgeMetadataType type) {
+      return type == EdgeMetadataType::natural_edge;
+    }
+
     template<class Graph>
     static MetadataRating evaluate(
         const Graph& graph, HyperedgeID edge, RatingType score) {
@@ -34,7 +52,11 @@ namespace mt_kahypar {
     }
   };
 
-  struct NaturalEdgeContributeNegativePolicy {
+  struct NaturalEdgeContributeNegativePolicy final : public PolicyBase {
+    static bool isApplicable(const EdgeMetadataType type) {
+      return type == EdgeMetadataType::natural_edge;
+    }
+
     template<class Graph>
     static MetadataRating evaluate(
         const Graph& graph, HyperedgeID edge, RatingType score) {
@@ -42,4 +64,11 @@ namespace mt_kahypar {
       return {true, natural ? -score : score};
     }
   };
+
+  using EdgeMetadataRatingPolicies = kahypar::meta::Typelist<
+    IgnoreEdgeMetadataPolicy,
+    SkipNaturalEdgePolicy,
+    NaturalEdgeContributeZeroPolicy,
+    NaturalEdgeContributeNegativePolicy
+  >;
 }

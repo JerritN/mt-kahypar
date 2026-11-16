@@ -104,6 +104,7 @@ struct RatingParameters {
   RatingFunction rating_function = RatingFunction::heavy_edge;
   HeavyNodePenaltyPolicy heavy_node_penalty_policy = HeavyNodePenaltyPolicy::no_penalty;
   AcceptancePolicy acceptance_policy = AcceptancePolicy::best_prefer_unmatched;
+  EdgeMetadataRatingPolicy edge_metadata_policy = EdgeMetadataRatingPolicy::ignore;
 };
 
 struct CoarseningParameters {

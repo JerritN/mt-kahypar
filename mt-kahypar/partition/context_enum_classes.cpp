@@ -275,6 +275,17 @@ namespace mt_kahypar {
       return os << static_cast<uint8_t>(type);
   }
 
+  std::ostream & operator<< (std::ostream& os, const EdgeMetadataRatingPolicy& policy) {
+      switch (policy) {
+        case EdgeMetadataRatingPolicy::ignore: return os << "ignore";
+        case EdgeMetadataRatingPolicy::skip_natural_edge: return os << "skip_natural_edge";
+        case EdgeMetadataRatingPolicy::natural_edge_contribute_zero: return os << "natural_edge_contribute_zero";
+        case EdgeMetadataRatingPolicy::natural_edge_contribute_negative: return os << "natural_edge_contribute_negative";
+          // omit default case to trigger compiler warning for missing cases
+      }
+      return os << static_cast<uint8_t>(policy);
+  }
+
   Mode modeFromString(const std::string& mode) {
     if (mode == "rb" || mode == "recursive_bipartitioning") {
       return Mode::recursive_bipartitioning;
@@ -517,5 +528,19 @@ namespace mt_kahypar {
       }
       throw InvalidParameterException("Illegal option: " + type);
       return EdgeMetadataType::NONE;
+  }
+
+  EdgeMetadataRatingPolicy edgeMetadataRatingPolicyFromString(const std::string& policy) {
+      if (policy == "ignore") {
+        return EdgeMetadataRatingPolicy::ignore;
+      } else if (policy == "skip_natural_edge") {
+        return EdgeMetadataRatingPolicy::skip_natural_edge;
+      } else if (policy == "natural_edge_contribute_zero") {
+        return EdgeMetadataRatingPolicy::natural_edge_contribute_zero;
+      } else if (policy == "natural_edge_contribute_negative") {
+        return EdgeMetadataRatingPolicy::natural_edge_contribute_negative;
+      }
+      throw InvalidParameterException("Illegal option: " + policy);
+      return EdgeMetadataRatingPolicy::ignore;
   }
 }
