@@ -1,13 +1,13 @@
 #pragma once
 
 #include "mt-kahypar/datastructures/hypergraph_common.h"
+#include "mt-kahypar/partition/context_enum_classes.h"
 
 #include "kahypar-resources/meta/policy_registry.h"
 #include "kahypar-resources/meta/typelist.h"
 
 namespace mt_kahypar {
   using PolicyBase = kahypar::meta::PolicyBase;
-  using PolicyRegistry = kahypar::meta::PolicyRegistry<PolicyBase>;
 
   struct MetadataRating {
     bool include;

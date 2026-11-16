@@ -112,6 +112,7 @@ namespace mt_kahypar {
     str << "    Rating Function:                  " << params.rating_function << std::endl;
     str << "    Heavy Node Penalty:               " << params.heavy_node_penalty_policy << std::endl;
     str << "    Acceptance Policy:                " << params.acceptance_policy << std::endl;
+    str << "    Edge Metadata Policy:             " << params.edge_metadata_policy << std::endl;
   }
 
   void printParams(std::ostream& str, const CoarseningParameters& params, const PartitioningParameters& pp, bool verbose) {
@@ -576,6 +577,13 @@ namespace mt_kahypar {
       if (switched) {
         print_warning("Switching to deterministic algorithm variants since deterministic mode is active");
       }
+    }
+
+    if (coarsening.rating.edge_metadata_policy != EdgeMetadataRatingPolicy::ignore &&
+        coarsening.algorithm != CoarseningAlgorithm::multilevel_coarsener) {
+      throw InvalidParameterException(
+        "Edge metadata rating policies are currently supported "
+        "only by the multilevel coarsener.");
     }
 
     if ( partition.instance_type == InstanceType::UNDEFINED ) {
